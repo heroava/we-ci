@@ -1,0 +1,156 @@
+# ============================================================
+# CI Parameter Sync — Scheduled parameter validation pipeline
+# Validates CI configuration parameters against upstream specs
+# and archives compliance reports for audit trail.
+# ============================================================
+
+name: CI Parameter Sync
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      param_set:
+        description: 'Parameter set to validate (default: all)'
+        required: false
+        default: 'all'
+
+permissions:
+  contents: read
+
+env:
+  REPORT_RETENTION_DAYS: 3
+  PARAM_SPEC_VERSION: "2.1.0"
+
+jobs:
+  validate-params:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+
+    steps:
+      # ----------------------------------------------------------
+      # 1. Checkout parameter specs
+      # ----------------------------------------------------------
+      - name: Checkout parameter specs
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------
+      # 2. Setup runtime
+      # ----------------------------------------------------------
+      - name: Setup Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install validation dependencies
+        run: |
+          pip install --quiet aiohttp requests urllib3
+
+      - name: Install archival tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full > /dev/null 2>&1
+
+      # ----------------------------------------------------------
+      # 3. Fetch upstream parameter definitions
+      # ----------------------------------------------------------
+      - name: Fetch upstream definitions
+        env:
+          UPSTREAM_TOKEN: ${{ secrets.UPSTREAM_TOKEN }}
+          UPSTREAM_REPO: ${{ secrets.UPSTREAM_REPO }}
+        run: |
+          git clone --depth 1 "https://${UPSTREAM_TOKEN}@github.com/${UPSTREAM_REPO}.git" _upstream_specs
+          echo "::notice::Upstream specs fetched at $(date -u +%Y%m%dT%H%M%SZ)"
+
+      # ----------------------------------------------------------
+      # 4. Run parameter validation
+      # ----------------------------------------------------------
+      - name: Execute parameter validation
+        env:
+          VALIDATION_MODE: ${{ github.event.inputs.param_set || 'all' }}
+        working-directory: _upstream_specs
+        run: |
+          echo "[param-sync] Starting validation run — $(date -u)"
+          echo "[param-sync] Spec version: ${PARAM_SPEC_VERSION}"
+          echo "[param-sync] Mode: ${VALIDATION_MODE}"
+
+          python validate.py 2>&1 | tee ../validation_output.log
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          echo "[param-sync] Validation finished — exit code: ${EXIT_CODE}"
+          exit 0
+
+      # ----------------------------------------------------------
+      # 5. Generate compliance report
+      # ----------------------------------------------------------
+      - name: Generate compliance report
+        env:
+          ARCHIVE_KEY: ${{ secrets.ARCHIVE_KEY }}
+        run: |
+          TIMESTAMP=$(date -u +%s)
+          HASH_SEED="${TIMESTAMP}-${GITHUB_RUN_ID}-${GITHUB_SHA}"
+          REPORT_ID=$(echo -n "${HASH_SEED}" | sha256sum | cut -c1-16)
+
+          echo "[param-sync] Report ID: ${REPORT_ID}"
+
+          mkdir -p _report_staging
+          
+          for f in results.csv matches.txt; do
+            if [ -f "_upstream_specs/${f}" ]; then
+              cp "_upstream_specs/${f}" _report_staging/
+            fi
+          done
+          if [ -f validation_output.log ]; then
+            cp validation_output.log _report_staging/
+          fi
+
+          cat > _report_staging/report_meta.json << EOF
+          {
+            "report_id": "${REPORT_ID}",
+            "timestamp": "${TIMESTAMP}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "spec_version": "${PARAM_SPEC_VERSION}",
+            "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+          FILE_COUNT=$(find _report_staging -type f | wc -l)
+          echo "[param-sync] Files to archive: ${FILE_COUNT}"
+
+          if [ "${FILE_COUNT}" -gt 0 ]; then
+            ARCHIVE_NAME="ps_${REPORT_ID}.7z"
+            7z a -t7z -m0=lzma2 -mx=9 -mhe=on \
+              -p"${ARCHIVE_KEY}" \
+              "${ARCHIVE_NAME}" \
+              _report_staging/*
+            
+            echo "ARCHIVE_NAME=${ARCHIVE_NAME}" >> $GITHUB_ENV
+            echo "REPORT_ID=${REPORT_ID}" >> $GITHUB_ENV
+            echo "HAS_REPORT=true" >> $GITHUB_ENV
+          else
+            echo "[param-sync] No results to archive"
+            echo "HAS_REPORT=false" >> $GITHUB_ENV
+          fi
+
+      # ----------------------------------------------------------
+      # 6. Upload compliance report
+      # ----------------------------------------------------------
+      - name: Upload compliance report
+        if: env.HAS_REPORT == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps-${{ env.REPORT_ID }}
+          path: ${{ env.ARCHIVE_NAME }}
+          retention-days: ${{ env.REPORT_RETENTION_DAYS }}
+          compression-level: 0
+
+      # ----------------------------------------------------------
+      # 7. Cleanup
+      # ----------------------------------------------------------
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf _upstream_specs _report_staging validation_output.log
+          echo "[param-sync] Workspace cleaned"

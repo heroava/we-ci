@@ -1,0 +1,8 @@
+.env
+*.7z
+*.csv
+*.log
+__pycache__/
+*.pyc
+_upstream_specs/
+_report_staging/

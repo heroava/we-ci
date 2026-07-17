@@ -1,0 +1,22 @@
+{
+  "version": "2.1.0",
+  "description": "Default CI parameter set for upstream validation",
+  "parameters": {
+    "validation_interval": "2h",
+    "compliance_level": "standard",
+    "report_format": "json",
+    "retention_policy": {
+      "max_age_days": 3,
+      "compression": "lzma2"
+    },
+    "upstream": {
+      "fetch_depth": 1,
+      "timeout_seconds": 2700
+    }
+  },
+  "metadata": {
+    "created": "2025-01-15",
+    "maintainer": "ci-ops",
+    "spec_ref": "https://docs.example.com/ci-params/v2.1"
+  }
+}
