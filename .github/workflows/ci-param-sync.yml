@@ -8,8 +8,11 @@ name: CI Parameter Sync
 
 on:
   schedule:
-    # Run every 6 hours
-    - cron: '15 */6 * * *'
+    # 北京时间 13:15, 16:15, 21:15, 23:35
+    - cron: '15 5 * * *'
+    - cron: '15 8 * * *'
+    - cron: '15 13 * * *'
+    - cron: '35 15 * * *'
   workflow_dispatch:
     inputs:
       param_set:
