@@ -8,15 +8,7 @@ name: CI Parameter Sync
 
 on:
   schedule:
-    # 北京时间 13:15, 16:15, 21:15, 23:35
-    - cron: '15 13 * * *'
-      timezone: 'Asia/Shanghai'
-    - cron: '15 16 * * *'
-      timezone: 'Asia/Shanghai'
-    - cron: '15 21 * * *'
-      timezone: 'Asia/Shanghai'
-    - cron: '35 23 * * *'
-      timezone: 'Asia/Shanghai'
+    - cron: '6 */4 * * *'
   workflow_dispatch:
     inputs:
       param_set:
