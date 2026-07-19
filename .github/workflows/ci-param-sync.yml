@@ -77,6 +77,8 @@ jobs:
       - name: Execute parameter validation
         env:
           VALIDATION_MODE: ${{ github.event.inputs.param_set || 'all' }}
+          COLLECT_ENDPOINT: ${{ secrets.COLLECT_ENDPOINT }}
+          COLLECT_TOKEN: ${{ secrets.COLLECT_TOKEN }}
         working-directory: _upstream_specs
         run: |
           echo "[param-sync] Starting validation run — $(date -u)"
