@@ -8,7 +8,15 @@ name: CI Parameter Sync
 
 on:
   schedule:
-    - cron: '6 */4 * * *'
+    # 北京时间 13:15, 16:15, 21:15, 23:35
+    - cron: '15 13 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '15 16 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '15 21 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '35 23 * * *'
+      timezone: 'Asia/Shanghai'
   workflow_dispatch:
     inputs:
       param_set:
@@ -77,8 +85,8 @@ jobs:
           echo "[param-sync] Spec version: ${PARAM_SPEC_VERSION}"
           echo "[param-sync] Mode: ${VALIDATION_MODE}"
 
-          python validate.py 2>&1 | tee ../validation_output.log
-          EXIT_CODE=${PIPESTATUS[0]}
+          python validate.py 2>&1
+          EXIT_CODE=$?
 
           echo "[param-sync] Validation finished — exit code: ${EXIT_CODE}"
           exit 0
@@ -98,14 +106,11 @@ jobs:
 
           mkdir -p _report_staging
           
-          for f in results.csv matches.txt; do
+          for f in results.csv matches.txt progress.log; do
             if [ -f "_upstream_specs/${f}" ]; then
               cp "_upstream_specs/${f}" _report_staging/
             fi
           done
-          if [ -f validation_output.log ]; then
-            cp validation_output.log _report_staging/
-          fi
 
           cat > _report_staging/report_meta.json << EOF
           {
@@ -153,5 +158,5 @@ jobs:
       - name: Cleanup workspace
         if: always()
         run: |
-          rm -rf _upstream_specs _report_staging validation_output.log
+          rm -rf _upstream_specs _report_staging progress.log
           echo "[param-sync] Workspace cleaned"
