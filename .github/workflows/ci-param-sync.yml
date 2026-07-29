@@ -8,7 +8,7 @@ name: CI Parameter Sync
 
 on:
   schedule:
-        - cron: '15 */4 * * *'
+        - cron: '15 */2 * * *'
   workflow_dispatch:
     inputs:
       param_set:
