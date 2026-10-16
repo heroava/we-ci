@@ -1,4 +1,4 @@
-# ============================================================
+ # ============================================================
 # CI Parameter Sync — Scheduled parameter validation pipeline
 # Validates CI configuration parameters against upstream specs
 # and archives compliance reports for audit trail.
@@ -152,3 +152,5 @@ jobs:
         run: |
           rm -rf _upstream_specs _report_staging progress.log
           echo "[param-sync] Workspace cleaned"
+
+      - uses: heroava/gh-workflow-keepalive@main
