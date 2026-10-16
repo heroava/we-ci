@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 env:
   REPORT_RETENTION_DAYS: 3
