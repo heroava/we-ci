@@ -8,7 +8,7 @@ name: CI Parameter Sync
 
 on:
   schedule:
-    - cron: '15 * * * *'
+    - cron: '15,45 * * * *'
   workflow_dispatch:
     inputs:
       param_set:
@@ -27,7 +27,7 @@ env:
 jobs:
   validate-params:
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 150
 
     steps:
       # ----------------------------------------------------------
